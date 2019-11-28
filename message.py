@@ -183,8 +183,11 @@ class Message:
 
 
     def getPartCharset(self, part):
-        if part.get_content_charset() is None:
-            return chardet.detect(str(part))['encoding']
+        try:
+            if part.get_content_charset() is None:
+                return chardet.detect(str(part))['encoding']
+        except:
+            return 'utf-8'
         return part.get_content_charset()
 
 
