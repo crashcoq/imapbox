@@ -9,11 +9,12 @@ import os
 
 def load_configuration(args):
     config = configparser.ConfigParser(allow_no_value=True)
-    config.read(['/etc/imapbox/config.cfg', os.path.expanduser('~/.config/imapbox/config.cfg')])
+    #config.read(['imapbox.cfg', os.path.expanduser('~/.config/imapbox/config.cfg')])
+    config.read(['/srv/dev-disk-by-label-MULTIMEDIA/DONNEE/Backup_Mail/imapbox.cfg'])
 
     options = {
         'days': None,
-        'local_folder': '.',
+        #'local_folder': '.',
         'wkhtmltopdf': None,
         'accounts': []
     }
@@ -22,8 +23,8 @@ def load_configuration(args):
         if config.has_option('imapbox', 'days'):
             options['days'] = config.getint('imapbox', 'days')
 
-        if config.has_option('imapbox', 'local_folder'):
-            options['local_folder'] = os.path.expanduser(config.get('imapbox', 'local_folder'))
+        #if config.has_option('imapbox', 'local_folder'):
+            #options['local_folder'] = os.path.expanduser(config.get('imapbox', 'local_folder'))
 
         if config.has_option('imapbox', 'wkhtmltopdf'):
             options['wkhtmltopdf'] = os.path.expanduser(config.get('imapbox', 'wkhtmltopdf'))
@@ -53,13 +54,16 @@ def load_configuration(args):
         if config.has_option(section, 'remote_folder'):
             account['remote_folder'] = config.get(section, 'remote_folder')
 
+        if config.has_option(section, 'local_folder'):
+            account['local_folder'] = config.get(section, 'local_folder')
+
         if (None == account['host'] or None == account['username'] or None == account['password']):
             continue
 
         options['accounts'].append(account)
 
-    if (args.local_folder):
-        options['local_folder'] = args.local_folder
+    #if (args.local_folder):
+        #options['local_folder'] = args.local_folder
 
     if (args.days):
         options['days'] = args.days
@@ -82,17 +86,17 @@ def main():
     options = load_configuration(args)
 
     for account in options['accounts']:
-
         print('{}/{} (on {})'.format(account['name'], account['remote_folder'], account['host']))
 
         if account['remote_folder'] == "__ALL__":
             for folder_entry in get_folder_fist(account):
-                folder_name = folder_entry.decode().split(' "." ')
+                folder_name = folder_entry.decode().split('"/" ')
                 print("Saving folder: " + folder_name[1])
                 account['remote_folder'] = folder_name[1]
-                save_emails(account, options)
+                if account['remote_folder'] != '"[Gmail]"':
+                    save_emails(account, options, account['remote_folder'])
         else:
-            save_emails(account, options)
+            save_emails(account, options, account['remote_folder'])
 
 if __name__ == '__main__':
     main()

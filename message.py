@@ -11,6 +11,7 @@ import json
 import io
 import mimetypes
 import chardet
+from chardet.universaldetector import UniversalDetector
 import gzip
 import cgi
 import time
@@ -93,7 +94,7 @@ class Message:
             return u"".join(headers)
 
 
-    def getmailaddresses(self, prop):
+    '''def getmailaddresses(self, prop):
         """retrieve From:, To: and Cc: addresses"""
         addrs=email.utils.getaddresses(self.msg.get_all(prop, []))
         for i, (name, addr) in enumerate(addrs):
@@ -111,8 +112,9 @@ class Message:
                 # address must match adress regex
                 if not email_address_re.match(addr.decode("utf-8")):
                     addr=''
-            addrs[i]=(self.getmailheader(name), addr.decode("utf-8"))
-        return addrs
+            #addrs[i]=(self.getmailheader(name), addr.decode("utf-8"))
+            addrs[i]=(self.getmailheader(name), addr)
+        return addrs'''
 
     def getSubject(self):
         if not hasattr(self, 'subject'):
@@ -121,9 +123,20 @@ class Message:
 
     def getFrom(self):
         if not hasattr(self, 'from_'):
-            self.from_ = self.getmailaddresses('from')
-            self.from_ = ('', '') if not self.from_ else self.from_[0]
+            #self.from_ = self.getmailaddresses('from')
+            #self.from_ = ('', '') if not self.from_ else self.from_[0]
+            self.from_ = self.getmailheader(self.msg.get('from', ''))
         return self.from_
+
+    def getCC(self):
+        if not hasattr(self, 'cc'):
+            self.cc = self.getmailheader(self.msg.get('cc', ''))
+        return self.cc
+
+    def getTO(self):
+        if not hasattr(self, 'to'):
+            self.to = self.getmailheader(self.msg.get('to', ''))
+        return self.to
 
     def normalizeDate(self, datestr):
         t = email.utils.parsedate_tz(datestr)
@@ -135,9 +148,9 @@ class Message:
 
         return (rfc2822, iso8601)
 
-    def createMetaFile(self):
-        tos=self.getmailaddresses('to')
-        ccs=self.getmailaddresses('cc')
+    def createMetaFile(self, remote_folder, tos, froms, ccs):
+        #tos=self.wgetmailaddresses('to')
+        #ccs=self.getmailaddresses('cc')
 
         parts = self.getParts()
         attachments = []
@@ -154,13 +167,16 @@ class Message:
 
         rfc2822, iso8601 = self.normalizeDate(self.msg['Date'])
 
-        with io.open('%s/metadata.json' %(self.directory), 'w', encoding='utf8') as json_file:
+        with io.open('%s/metadata.json' %(self.directory), 'w+', encoding='utf8') as json_file:
             data = json.dumps({
                 'Id': self.msg['Message-Id'],
+                'Folder': remote_folder,
                 'Subject' : self.getSubject(),
                 'From' : self.getFrom(),
-                'To' : tos,
-                'Cc' : ccs,
+                #'To' : tos,
+                'To' : self.getTO(),
+                #'Cc' : ccs,
+                'Cc' : self.getCC(),
                 'Date' : rfc2822,
                 'Utc' : iso8601,
                 'Attachments': attachments,
@@ -173,9 +189,6 @@ class Message:
 
             json_file.close()
 
-
-
-
     def createRawFile(self, data):
         f = gzip.open('%s/raw.eml.gz' %(self.directory), 'wb')
         f.write(data)
@@ -183,8 +196,16 @@ class Message:
 
 
     def getPartCharset(self, part):
-        if part.get_content_charset() is None:
-            return chardet.detect(str(part))['encoding']
+        try:
+            #print(str(part.get_content_charset()))
+            if part.get_content_charset() is None:
+                #return chardet.detect(b'part')['encoding']
+                #part.replace('charset="', 'charset=')
+                #print(str(chardet.detect(b'part')['encoding']))
+                return str(chardet.detect(b'part')['encoding'])
+                return chardet.detect(str(part))['encoding']
+        except:
+           return 'utf-8'
         return part.get_content_charset()
 
 

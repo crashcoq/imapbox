@@ -18,9 +18,16 @@ class MailboxClient:
     def __init__(self, host, port, username, password, remote_folder):
         self.mailbox = imaplib.IMAP4_SSL(host, port)
         self.mailbox.login(username, password)
-        self.mailbox.select(remote_folder, readonly=True)
+        typ, data = self.mailbox.select(remote_folder, readonly=True)
+        if typ != 'OK':
+            # Handle case where Exchange/Outlook uses '.' path separator when
+            # reporting subfolders. Adjust to use '/' on remote.
+            adjust_remote_folder = re.sub('\.', '/', remote_folder)
+            typ, data = self.mailbox.select(adjust_remote_folder, readonly=True)
+            if typ != 'OK':
+                print("MailboxClient: Could not select remote folder '%s'" % remote_folder)
 
-    def copy_emails(self, days, local_folder, wkhtmltopdf):
+    def copy_emails(self, days, local_folder, wkhtmltopdf, remote_folder):
 
         n_saved = 0
         n_exists = 0
@@ -33,10 +40,13 @@ class MailboxClient:
             date = (datetime.date.today() - datetime.timedelta(days)).strftime("%d-%b-%Y")
             criterion = '(SENTSINCE {date})'.format(date=date)
 
+        self.mailbox.select(remote_folder, readonly=True)
         typ, data = self.mailbox.search(None, criterion)
         for num in data[0].split():
             typ, data = self.mailbox.fetch(num, '(RFC822)')
-            if self.saveEmail(data):
+## modif
+            if self.saveEmail(data, remote_folder):
+## modif
                 n_saved += 1
             else:
                 n_exists += 1
@@ -66,10 +76,13 @@ class MailboxClient:
 
 
 
-    def saveEmail(self, data):
+    def saveEmail(self, data, remote_folder):
         for response_part in data:
             if isinstance(response_part, tuple):
                 msg = ""
+            #if isinstance(response_part[1], str):
+                #msg = email.message_from_string(response_part[1])
+            #else:
                 try:
                     msg = email.message_from_string(response_part[1].decode("utf-8"))
                 except:
@@ -86,7 +99,9 @@ class MailboxClient:
                 try:
                     message = Message(directory, msg)
                     message.createRawFile(data[0][1])
-                    message.createMetaFile()
+## modif
+                    message.createMetaFile(remote_folder, msg['to'], msg['from'], msg['cc'])
+## modif
                     message.extractAttachments()
 
                     if self.wkhtmltopdf:
@@ -104,9 +119,9 @@ class MailboxClient:
         return True
 
 
-def save_emails(account, options):
+def save_emails(account, options, remote_folder):
     mailbox = MailboxClient(account['host'], account['port'], account['username'], account['password'], account['remote_folder'])
-    stats = mailbox.copy_emails(options['days'], options['local_folder'], options['wkhtmltopdf'])
+    stats = mailbox.copy_emails(options['days'], account['local_folder'], options['wkhtmltopdf'], remote_folder)
     mailbox.cleanup()
     print('{} emails created, {} emails already exists'.format(stats[0], stats[1]))
 
