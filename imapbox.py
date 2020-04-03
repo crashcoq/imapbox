@@ -10,7 +10,7 @@ import os
 def load_configuration(args):
     config = configparser.ConfigParser(allow_no_value=True)
     #config.read(['imapbox.cfg', os.path.expanduser('~/.config/imapbox/config.cfg')])
-    config.read(['/srv/dev-disk-by-label-MULTIMEDIA/DONNEE/Backup_Mail/imapbox.cfg'])
+    config.read(['imapbox.cfg'])
 
     options = {
         'days': None,
